@@ -4,7 +4,8 @@
            [ring.middleware.reload :refer [wrap-reload]]
            [ring.middleware.defaults :refer :all]
            [ring.util.response :as response]
-           [compojure.core :refer [GET] :as c]
+           [ring.util.anti-forgery :refer [anti-forgery-field]]
+           [compojure.core :refer [GET POST] :as c]
            [compojure.route :as route]
            [hiccup.core :refer [html]]
 
@@ -68,7 +69,8 @@
        [:h1 "Hello world"]
        (format-names names)
        [:form {:action "/save"
-               :method "get"}
+               :method "post"}
+        (anti-forgery-field)
         [:label "Name "]
         [:input {:type "text" :name "name"}]
         [:input {:type "submit" :value "Save"}]]
@@ -95,7 +97,7 @@
 (def routes
   (c/routes 
     (GET "/" r (html-response <index> r))
-    (GET "/save" [name :as r] (api-save name r))
+    (POST "/save" [name :as r] (api-save name r))
     (GET "/delete" [name :as r] (api-delete name r))
     (route/resources "/static" {:root "static"})
     (route/not-found (html-response <not-found>))))
