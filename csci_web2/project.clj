@@ -8,6 +8,9 @@
                  [stuarth/clj-oauth2 "0.3.2"]
                  [org.clojure/java.jdbc "0.7.6"]
                  [org.postgresql/postgresql "LATEST"]
-                 ]
+                 [clj-http "3.9.0"]
+                 [org.clojure/data.json "0.2.6"]
+                 [environ "1.1.0"]]
+  :plugins [[lein-environ "1.1.0"]]
   :main csci-web2.core/start-server
 )

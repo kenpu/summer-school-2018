@@ -11,12 +11,30 @@
 
            ;; database
            [clojure.java.jdbc :as sql]
+
+           ;; oauth
+           [ring.middleware.oauth2 :refer [wrap-oauth2]]
+           [clj-http.client :as client]
+           [clojure.data.json :as json]
+
+           ;; env
+           [environ.core :refer [env]]
            ))
 
 (def db-spec {:subprotocol "postgresql" 
-              :subname "//localhost:9999/mydb" 
-              :user "mary" 
-              :password "abc"})
+              :subname (env :db-url)
+              :user (env :db-user)
+              :password (env :db-password)})
+
+(def github-spec
+  {:github {:authorize-uri    "https://github.com/login/oauth/authorize"
+			:access-token-uri "https://github.com/login/oauth/access_token"
+			:client-id        (env :client-id)
+			:client-secret    (env :client-secret)
+			:scopes           ["user:email"]
+			:launch-uri       "/oauth2/github"
+			:redirect-uri     "/oauth2/github/callback"
+			:landing-uri      "/"}})
 
 (defn db-get-names []
   (try (sql/with-db-connection 
@@ -61,9 +79,19 @@
                   :href "/static/css/style.css"}]]
          [:body body]]))
 
+(defn get-github-user-info [token]
+  (if (not (empty? token))
+    (-> (client/get "https://api.github.com/user/emails" 
+                    {:headers {:Authorization (str "token " token)}})
+        (get :body)
+        (json/read-str :key-fn keyword))
+    nil))
+
 (defn <index>
   [r]
-  (let [names (db-get-names)]
+  (let [names (db-get-names)
+        github-token (get-in r [:oauth2/access-tokens :github :token])
+        user-info (get-github-user-info github-token)]
     (page-html 
       [:div
        [:h1 "Hello world"]
@@ -74,6 +102,11 @@
         [:label "Name "]
         [:input {:type "text" :name "name"}]
         [:input {:type "submit" :value "Save"}]]
+       [:hr]
+       (if (nil? github-token)
+         [:p "Do you want to login? "
+            [:a {:href "/oauth2/github"} "as github user?"]]
+         [:pre (with-out-str (pprint user-info))])
        ])))
 
 (defn <not-found>
@@ -94,15 +127,20 @@
         (response/redirect url))
     (response/redirect "/")))
 
+(defn oauth-callback [r]
+  (response/redirect "/"))
+
 (def routes
   (c/routes 
     (GET "/" r (html-response <index> r))
     (POST "/save" [name :as r] (api-save name r))
     (GET "/delete" [name :as r] (api-delete name r))
+    (GET "/oauth2/github/callback" r (oauth-callback r))
     (route/resources "/static" {:root "static"})
     (route/not-found (html-response <not-found>))))
 
 (def app (-> routes
+             (wrap-oauth2 github-spec)
              (wrap-defaults site-defaults)
              (wrap-reload)))
 
