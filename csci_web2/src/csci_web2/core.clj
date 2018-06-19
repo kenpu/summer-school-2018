@@ -34,7 +34,7 @@
 			:scopes           ["user:email"]
 			:launch-uri       "/oauth2/github"
 			:redirect-uri     "/oauth2/github/callback"
-			:landing-uri      "/"}})
+			:landing-uri      "/landing"}})
 
 (defn db-get-names []
   (try (sql/with-db-connection 
@@ -104,10 +104,20 @@
         [:input {:type "submit" :value "Save"}]]
        [:hr]
        (if (nil? github-token)
-         [:p "Do you want to login? "
-            [:a {:href "/oauth2/github"} "as github user?"]]
-         [:pre (with-out-str (pprint user-info))])
+         [:p "Do you want to login?"
+            " client-id " (env :client-id)
+            [:a {:href "/oauth2/github"} " as github user?"]]
+         [:div [:pre (with-out-str (pprint user-info))]
+          [:a {:href "/logout"} "logout"]])
        ])))
+
+(defn <user>
+  [r]
+  (let [github-token (get-in r [:oauth2/access-tokens :github :token])
+        user-info (get-github-user-info github-token)]
+    (page-html [:div
+                [:h1 "This is the user"]
+                [:pre (with-out-str (pprint user-info))]])))
 
 (defn <not-found>
   []
@@ -127,21 +137,29 @@
         (response/redirect url))
     (response/redirect "/")))
 
-(defn oauth-callback [r]
-  (response/redirect "/"))
+(defn logout [r]
+  (-> (response/redirect "/")
+      (assoc :session nil)))
 
 (def routes
   (c/routes 
     (GET "/" r (html-response <index> r))
     (POST "/save" [name :as r] (api-save name r))
     (GET "/delete" [name :as r] (api-delete name r))
-    (GET "/oauth2/github/callback" r (oauth-callback r))
+    ;; (GET "/oauth2/github/callback" r (oauth-callback r))
+    (GET "/landing" r (-> (response/response "this is landing")
+                          (response/content-type "text/html")))
+    (GET "/user" r (html-response <user>))
+    (GET "/logout" r (logout r))
     (route/resources "/static" {:root "static"})
     (route/not-found (html-response <not-found>))))
 
+(def my-site-defaults
+  (-> site-defaults (assoc-in [:session :cookie-attrs :same-site] :lax)))
+
 (def app (-> routes
              (wrap-oauth2 github-spec)
-             (wrap-defaults site-defaults)
+             (wrap-defaults my-site-defaults)
              (wrap-reload)))
 
 (defn start-server []
