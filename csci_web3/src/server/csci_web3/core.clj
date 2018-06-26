@@ -14,7 +14,7 @@
       [:link {:rel "stylesheet"
               :href "/static/style.css"}]]
      [:body
-      [:h1 "Hello Web 3"]
+      [:div {:id "main-body"}]
       [:script {:src "/static/js/main.js"}]]]))
 
 

@@ -7,7 +7,9 @@
 
                  ;; client-side
                  [org.clojure/clojurescript "1.9.946"]
-                 [reagent "0.7.0"]]
+                 [reagent "0.7.0"]
+                 [org.clojure/core.async "0.4.474"]
+                 ]
   :plugins [[lein-cljsbuild "1.1.7"]]
 
   ;; server build config
