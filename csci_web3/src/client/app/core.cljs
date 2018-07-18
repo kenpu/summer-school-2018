@@ -1,45 +1,101 @@
 (ns app.core
-  (:require-macros [cljs.core.async.macros :refer [go go-loop]])
-  (:require [clojure.string :as s]
-            [reagent.core :as r]
-            [clojure.core.async :refer [chan <! >! timeout close!]]
-            ))
+  (:require [reagent.core :as r]))
+
 (enable-console-print!)
 
-(defn body
-  [ch box]
-  [:div 
-   [:button {:on-click (fn [e]
-                         (go (>! ch "click")))} "Click"]
-   [:h1 "hello world"]
-   [:h2 "planet"]
-   [:h3 "earth"]
-   [:h4 "from " @box]])
+(defn Footer [args]
+  (let [{:keys [author date company]} args
+        style {:style {:margin-right 30
+                       :font-size "20pt"}}]
+    [:div {:style {:position :fixed
+                   :bottom 0
+                   :left 0
+                   :width "100%"
+                   :background :black
+                   :text-align :right
+                   :color :white}}
+     [:span style author]
+     [:span style company]
+     [:span style "©" date]]))
 
-(defn view
-  [ch]
-  (let [data-box (r/atom "Mars")]
-    (r/render [body ch data-box] (.getElementById js/document "main-body"))
-    data-box))
+(defn Counter
+  []
+  (let [counter-state (r/atom 0)]
+    (fn [message]
+      [:div
+       [:button {:on-click (fn [] (swap! counter-state inc))} "Increment"]
+       [:p 
+        [:span message]
+        [:span {:style {:margin-left 10
+                        :font-weight :bold}}
+         @counter-state]]])))
 
-(defn add-ticks
-  [ch t]
-  (go-loop []
-      (<! (timeout t))
-      (>! ch "tick")
-      (recur)))
+(defn LinkedCounter
+  [counter-state message & [option]]
+  (fn [counter-state message & [option]]
+    (let [count-value @counter-state
+          color (cond
+                  (< count-value 3) "#888"
+                  (< count-value 10) "#f88"
+                  :else "#000")]
+      [:span {:style {:color color
+                      :user-select :none}
+              :on-click (fn [e]
+                          (when-not (= option :readonly)
+                            (swap! counter-state inc)))} message " " count-value])))
 
-(defn start-animation
-  [signals-chan data-box]
-  (go
-    (loop []
-      (println "waiting...")
-      (let [x (<! signals-chan)]
-        (when x
-          (println "got chan")
-          (swap! data-box #(str % "." x))
-          (recur))))))
+(defn triangle-layer [w]
+  (r/create-class
+    {:reagent-render (fn [w] 
+                       [:div {:style {:width w
+                                      :height 20
+                                      :background "#888"
+                                      :border "thin solid black"
+                                      :margin-top 2}}])
+     :component-will-mount (fn [this]
+                             (println "another triangle layer will be seen"))
+     :component-will-unmount (fn [this]
+                               (println "a triangle layer will be destroyed"))
+     }))
 
-(let [ch (chan)]
-  (add-ticks ch 2000)
-  (start-animation ch (view ch)))
+(defn update-counter [v delta]
+  (let [v' (+ v delta)]
+    (if (pos? v') v' v)))
+
+(defn triangle
+  [counter-state]
+  [:div
+   {:on-click #(swap! counter-state update-counter -3)}
+   (for [i (range @counter-state)]
+     (let [w (+ 10 (* i 10))]
+       ^{:key i}
+       [triangle-layer w]))])
+
+(defn App [] 
+  (let [c1-state (r/atom 0)]
+    [:div.container
+     [:h1 "Global Watch Financials"]
+     [:div.jumbotron
+      [:h1 "Leading Machine Learning Managed Banking Products"]
+      [:h2 "The one source of personal financial freedom"]
+      [LinkedCounter c1-state "Number of products:" :readonly]
+      ]
+     [:div.row
+      [:div.col-xs-6
+       [:h3 "About us"]
+       [:p "We are a team of technos"]]
+      [:div.col-xs-6
+       [:h3 "Clients"]
+       [:p "blah blah"]
+       [LinkedCounter c1-state "Number of clients:"]
+       [triangle c1-state]
+       ]]
+     [Counter "Number of visitors:"]
+     [Footer {:author "Ken"
+              :company "UOIT"
+              :date "2018"}]
+     ]))
+
+(defn main [] (r/render [App] (.getElementById js/document "main-body")))
+
+(main)

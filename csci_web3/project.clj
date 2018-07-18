@@ -9,7 +9,10 @@
                  [org.clojure/clojurescript "1.9.946"]
                  [reagent "0.7.0"]
                  [org.clojure/core.async "0.4.474"]
-                 ]
+
+                 ;; websocket
+                 [http-kit "2.2.0"]]
+
   :plugins [[lein-cljsbuild "1.1.7"]]
 
   ;; server build config

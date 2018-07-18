@@ -1,25 +1,25 @@
 (ns csci-web2.core
-  (require [clojure.pprint :refer [pprint]]
-           [ring.adapter.jetty :as jetty]
-           [ring.middleware.reload :refer [wrap-reload]]
-           [ring.middleware.defaults :refer :all]
-           [ring.util.response :as response]
-           [ring.util.anti-forgery :refer [anti-forgery-field]]
-           [compojure.core :refer [GET POST] :as c]
-           [compojure.route :as route]
-           [hiccup.core :refer [html]]
+  (:require [clojure.pprint :refer [pprint]]
+            [ring.adapter.jetty :as jetty]
+            [ring.middleware.reload :refer [wrap-reload]]
+            [ring.middleware.defaults :refer :all]
+            [ring.util.response :as response]
+            [ring.util.anti-forgery :refer [anti-forgery-field]]
+            [compojure.core :refer [GET POST] :as c]
+            [compojure.route :as route]
+            [hiccup.core :refer [html]]
 
-           ;; database
-           [clojure.java.jdbc :as sql]
+            ;; database
+            [clojure.java.jdbc :as sql]
 
-           ;; oauth
-           [ring.middleware.oauth2 :refer [wrap-oauth2]]
-           [clj-http.client :as client]
-           [clojure.data.json :as json]
+            ;; oauth
+            [ring.middleware.oauth2 :refer [wrap-oauth2]]
+            [clj-http.client :as client]
+            [clojure.data.json :as json]
 
-           ;; env
-           [environ.core :refer [env]]
-           ))
+            ;; env
+            [environ.core :refer [env]]
+            ))
 
 (def db-spec {:subprotocol "postgresql" 
               :subname (env :db-url)
