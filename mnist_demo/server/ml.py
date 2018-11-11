@@ -4,6 +4,10 @@ mnist = tf.keras.datasets.mnist
 
 class Classifier:
     def __init__(self):
+        print("***********************************************")
+        print("************* creating classifier *************")
+        print("***********************************************")
+
         train, test = mnist.load_data()
         self.Xtrain, self.Ytrain = train
         self.Xtest, self.Ytest = test
@@ -12,11 +16,11 @@ class Classifier:
         self.Xtest = self.Xtest / 255.0
 
         model = tf.keras.models.Sequential([
-            tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(512, activation=tf.nn.relu),
-            tf.keras.layers.Dropout(0.2),
-            tf.keras.layers.Dense(10, activation=tf.nn.softmax),
-            ])
+            tf.keras.layers.Flatten(name="A"),
+            tf.keras.layers.Dense(512, activation=tf.nn.relu, name="B"),
+            tf.keras.layers.Dropout(0.2, name="C"),
+            tf.keras.layers.Dense(10, activation=tf.nn.softmax, name="D"),
+            ], name="layer0")
 
         optimizer = tf.keras.optimizers.Adam()
         model.compile(optimizer=optimizer, 
@@ -24,14 +28,15 @@ class Classifier:
                 metrics=['accuracy'])
 
         self.model = model
-        self.images = self.test_images(20)
+        self.train()
+        self.images = self.test_images(10)
 
-    def train(self, n=100):
+    def train(self, n=100, epochs=1):
         N = self.Xtrain.shape[0]
         I = np.random.randint(0, N-1, n)
         X = self.Xtrain[I, :, :]
         Y = self.Ytrain[I]
-        self.model.fit(X, Y, epochs=1)
+        self.model.fit(X, Y, epochs=epochs)
 
     def predict(self, X):
         return self.model.predict(X)
@@ -43,6 +48,19 @@ class Classifier:
 
     def test_images(self, n):
         return [self.test_digit_images(i, n) for i in range(10)]
+
+    def onecycle(self, train_size, epochs):
+        result = []
+        self.train(train_size, epochs)
+        for X in self.images:
+            Y = self.predict(X)
+            result.append(np.argmax(Y, axis=1).tolist())
+        return result
+
+classifier = Classifier()
+def get_classifier():
+    global classifier
+    return classifier
 
 if __name__ == '__main__':
     c = Classifier()

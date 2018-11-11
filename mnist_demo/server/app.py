@@ -1,19 +1,20 @@
 import flask
-from flask import Flask
+from flask import Flask, request, jsonify, g, session
 import ml
 from PIL import Image
 import io
 
-
 app = Flask(__name__)
-classifier = ml.Classifier()
 
 @app.route("/")
 def Index():
-    return "Hello:" + str(classifier.Xtrain.shape)
+    return "Hello"
 
 @app.route("/image/<int:digit>/<int:index>")
 def TestImage(digit, index):
+
+    classifier = ml.Classifier()
+
     n = len(classifier.images[0])
     if not ((0 <= digit <= 9) 
             and (0 <= index < n)):
@@ -28,4 +29,9 @@ def TestImage(digit, index):
     response.headers.set('Content-Type', 'image/png')
     return response
 
-app.run(port=9999, host="0.0.0.0", debug=True)
+@app.route("/predict")
+def Predict():
+    global classifier
+    # classifier = get_classifier()
+    return jsonify(result=classifier.onecycle(100, 1))
+
