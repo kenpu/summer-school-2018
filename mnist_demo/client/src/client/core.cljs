@@ -4,65 +4,71 @@
 (enable-console-print!)
 (println "This text is printed from src/client/core.cljs.")
 
-(def host "http://db.science.uoit.ca:9999")
+(def host "http://db.science.uoit.ca:8000")
 (def *num-images-per-digit* 10)
 
-
-(defn make-image-buckets []
-  (into {}
-        (for [digit (range 10)]
-          [digit
-           (for [index (range *num-images-per-digit*)]
-             (str host "/image/" digit "/" index))])))
-
 (defonce app-state (r/atom nil))
+(defn initialize-state! []
+  (swap! app-state
+         assoc
+         :images (for [d (range 10)
+                       i (range *num-images-per-digit*)]
+                   {:digit d
+                    :index i
+                    :predicted nil
+                    :id (+ i (* d *num-images-per-digit*))
+                    :url (str host "/image/" d "/" i)})))
 
-(defn initialize-state!
-  []
-  (swap! app-state assoc :image-buckets (make-image-buckets)))
+(defn predict! []
+  (.getJSON js/jQuery 
+            (str host "/learn")
+            (fn [data]
+              (swap! app-state
+                     update
+                     :images
+                     (fn [images]
+                       (for [[im y] (map vector images (js->clj data))]
+                         (assoc im :predicted y)))))))
 
-(defn predict!
-  []
-  (let (
-
+(defn organized-bucket
+  [images]
+  (let [bucket (into [] (repeat 10 []))
+        place (fn [bucket im]
+                 (let [i (if (:predicted im) (:predicted im) (:digit im))]
+                   (update bucket i conj im)))]
+    (reduce place bucket images)))
 
 ;; ==================================================================
 
 (defn Image
-  [src]
-  [:img {:src src
-         :style {:display :block}}])
+  [im]
+  (let [correct (= (:predicted im) (:digit im))]
+    [:img {:src (:url im)
+           :style {:display :inline-block
+                   :opacity (if correct 0.5 1.0)}}]))
 
-(defn ImageBuckets
-  [image-buckets]
+(defn ImageGrid
+  [bucket]
   [:div
-    [:div {:style {:display :flex
-                   :flex-direction :column}}
-     (for [digit (range 10)]
-       ^{:key digit}
-       [:div {:style {:display :flex
-                      :flex-direction :row}}
-        (for [[i im] (map-indexed vector (get image-buckets digit))] 
-          ^{:key i}
-          [:div [Image im]])])]])
-
+   (for [[i slot] (map-indexed vector bucket)]
+     ^{:key i}
+     [:div {:style {:display :flex}}
+      (for [im slot]
+        ^{:key (:id im)}
+        [Image im])])])
 
 (defn App []
   (r/create-class
     {:reagent-render
      (fn []
-       (let [images (get @app-state :image-buckets)]
-         [:div {:style {:display :flex
-                        :position :fixed
-                        :left 0
-                        :top 0
-                        :background :black
-                        :width "100%"
-                        :height "100%"}
-                :on-click (fn [ev]
-                            (println "Ding")
-                            (predict!))}
-          [ImageBuckets images]]))
+       [:div {:style {:position :fixed
+                      :width "100%"
+                      :height "100%"
+                      :top 0
+                      :left 0
+                      :background :black}
+              :on-click (fn [e] (predict!))}
+        [ImageGrid (organized-bucket (:images @app-state))]])
      }))
 
 (defn main []
