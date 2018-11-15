@@ -8,11 +8,13 @@ import tensorflow as tf
 import tensorflow.keras.datasets.mnist as mnist
 from tensorflow.keras.layers import *
 
-app = Flask(__name__)
+app = Flask(__name__, 
+        static_folder="../client/resources/public",
+        static_url_path="")
 CORS(app)
 
 def init():
-    global model, graph
+    global model, graph, weights
     model = tf.keras.models.Sequential([
         Flatten(input_shape=(28,28)),
         Dense(512, activation=tf.nn.relu),
@@ -23,6 +25,7 @@ def init():
     model.compile(optimizer=optimizer,
             loss='sparse_categorical_crossentropy',
             metrics=['accuracy'])
+    weights = model.get_weights()
     graph = tf.get_default_graph()
 
 def as_png(x):
@@ -49,10 +52,6 @@ def test_data(m):
         X.extend(X0[Y0 == d][:m])
     return np.array(X)
 
-@app.route("/")
-def Index():
-    return "Hello"
-
 @app.route("/image/<int:digit>/<int:index>")
 def GetImage(digit, index):
     X, Y = mnist.load_data()[-1]
@@ -63,10 +62,20 @@ def GetImage(digit, index):
 @app.route("/learn")
 def Learn():
     with graph.as_default():
-        model.fit(*train_data(1000), epochs=3)
+        model.fit(*train_data(1000), epochs=2)
         P = model.predict(test_data(10)).argmax(axis=1)
         return jsonify(P.tolist())
 
+@app.route("/restart")
+def Restart():
+    with graph.as_default():
+        model.set_weights(weights)
+        return "Okay"
+
+@app.route("/")
+def Index():
+    return app.send_static_file("index.html")
+
 if __name__ == '__main__':
     init()
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    app.run(host="0.0.0.0", port=8000, threaded=True)

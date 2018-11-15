@@ -45,11 +45,11 @@
                ;; This next build is a compressed minified build for
                ;; production. You can build this with:
                ;; lein cljsbuild once min
-               {:id "min"
+               {:id "production"
                 :source-paths ["src"]
                 :compiler {:output-to "resources/public/js/compiled/client.js"
                            :main client.core
-                           :optimizations :advanced
+                           :optimizations :whitespace
                            :pretty-print false}}]}
 
   :figwheel {;; :http-server-root "public" ;; default and assumes "resources"

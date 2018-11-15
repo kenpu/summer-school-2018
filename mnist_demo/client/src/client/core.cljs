@@ -6,29 +6,48 @@
 
 (def host "http://db.science.uoit.ca:8000")
 (def *num-images-per-digit* 10)
+(def *image-size* 104)
 
 (defonce app-state (r/atom nil))
 (defn initialize-state! []
   (swap! app-state
          assoc
+         :learning nil
+         :started nil
+         :counter 0
          :images (for [d (range 10)
                        i (range *num-images-per-digit*)]
                    {:digit d
                     :index i
-                    :predicted nil
+                    :predicted (rand-int 10)
                     :id (+ i (* d *num-images-per-digit*))
                     :url (str host "/image/" d "/" i)})))
 
-(defn predict! []
+(defn predict! [& [callback]]
+  (swap! app-state assoc :learning true)
   (.getJSON js/jQuery 
             (str host "/learn")
             (fn [data]
               (swap! app-state
-                     update
-                     :images
-                     (fn [images]
-                       (for [[im y] (map vector images (js->clj data))]
-                         (assoc im :predicted y)))))))
+                     (fn [state]
+                          (-> state
+                              (assoc :images (for [[im y] (map vector (:images state) (js->clj data))]
+                                               (assoc im :predicted y)))
+                              (assoc :learning nil)
+                              (update :counter inc))))
+              (when callback (callback)))))
+
+(defn restart! [& [callback]]
+  (swap! app-state assoc :learning true)
+  (.get js/jQuery
+        (str host "/restart")
+        (fn [data]
+          (swap! app-state
+                 (fn [state]
+                   (-> state
+                       (update :counter inc)
+                       (assoc :learning nil))))
+          (when callback (callback)))))
 
 (defn organized-bucket
   [images]
@@ -38,24 +57,68 @@
                    (update bucket i conj im)))]
     (reduce place bucket images)))
 
+(defn accuracy [images]
+  (let [x (reduce (fn [state im] 
+                     (if (= (:digit im) (:predicted im))
+                        (-> state
+                            (update :correct inc)
+                            (update :total inc))
+                        (-> state
+                            (update :total inc))))
+                    {:correct 0
+                     :total 0}
+                    images)]
+    (-> (/ (float (:correct x)) (:total x))
+        (* 100)
+        (Math/round)
+        (str "%"))))
+
+
+
+(defn do-loop! []
+  (let [state @app-state]
+    (when (:started state)
+      (if (zero? (rem (:counter state) 10))
+        (do (println "reset")
+            (restart! (fn [] (js/setTimeout do-loop! 2000))))
+        (do (println "prediction")
+            (predict! (fn [] (js/setTimeout do-loop! 2000))))))))
+
+(defn stop-loop! []
+  (println "stopping loop")
+  (swap! app-state assoc :started nil :counter 0))
+
+(defn start-loop! []
+  (println "starting loop")
+  (swap! app-state assoc :started true)
+  (restart! do-loop!))
+
 ;; ==================================================================
 
 (defn Image
-  [im]
-  (let [correct (= (:predicted im) (:digit im))]
-    [:img {:src (:url im)
-           :style {:display :inline-block
-                   :opacity (if correct 0.5 1.0)}}]))
+  [style im]
+  (let [correct (= (:predicted im) (:digit im))
+        imstyle (if correct
+                   {:opacity 1.0}
+                   {:opacity 0.5
+                    :border "2px solid red"})]
+    [:div {:style (merge style
+                         {:display :inline-block 
+                          :transition "all 1s"})}
+     [:img {:src (:url im)
+            :style imstyle}]]))
 
 (defn ImageGrid
   [bucket]
-  [:div
-   (for [[i slot] (map-indexed vector bucket)]
-     ^{:key i}
-     [:div {:style {:display :flex}}
-      (for [im slot]
+  [:div {:style {:position :relative}}
+   (for [[i slot] (map-indexed vector bucket) 
+         :let [top (* i *image-size*)]]
+      (for [[j im] (map-indexed vector slot)
+            :let [left (* j *image-size*)]]
         ^{:key (:id im)}
-        [Image im])])])
+        [Image {:position :absolute
+                :left left
+                :top top} im]))])
 
 (defn App []
   (r/create-class
@@ -66,9 +129,42 @@
                       :height "100%"
                       :top 0
                       :left 0
-                      :background :black}
-              :on-click (fn [e] (predict!))}
-        [ImageGrid (organized-bucket (:images @app-state))]])
+                      :cursor :pointer
+                      :background (if (:started @app-state) :black :maroon)} 
+              :on-click (fn []
+                           (if (:started @app-state)
+                             (stop-loop!)
+                             (start-loop!)))}
+        [ImageGrid (organized-bucket (:images @app-state))]
+        ;; learning indicator
+        (if (:learning @app-state)
+          [:div {:style {:position :fixed
+                         :left "50%"
+                         :top "50%"
+                         :width 300
+                         :height 200
+                         :margin-left -150
+                         :margin-top -100
+                         :display :flex
+                         :align-items :center
+                         :justify-content :center
+                         :color :white
+                         :font-size 50
+                         :font-weight 800
+                         :opacity 0.3
+                         :font-family "Helvetica"}}
+           [:p "Learning"]])
+        ;; cycle indicator
+        [:div {:style {:position :fixed
+                       :top "50%"
+                       :right 50
+                       :font-size 50
+                       :color :teal
+                       :font-family "Helvetica"
+                       :padding 20
+                       :font-weight :bold}
+               }
+         [:span (accuracy (:images @app-state))]]])
      }))
 
 (defn main []
